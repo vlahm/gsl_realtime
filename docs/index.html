@@ -14,48 +14,65 @@
       .then(data => {
         const dates = data.map(d => d.dateTime);
         const values = data.map(d => parseFloat(d.value));
+        
+        // Compute min and max, then add a buffer
+        const minY = Math.min(...values);
+        const maxY = Math.max(...values);
+        const yBuffer = (maxY - minY) * 0.05; // 5% buffer
+      
         const trace = {
-          x: dates,
-          y: values,
-          type: 'scatter',
-          mode: 'lines',
-          name: 'Gage height (ft)'
+      	x: dates,
+      	y: values,
+      	type: 'scatter',
+      	mode: 'lines',
+      	name: 'Gage height (ft)',
+      	line: { color: 'black' }
         };
+      
         const layout = {
-          title: 'GSL South Arm Water Level',
-          xaxis: { title: 'Date' },
-          yaxis: { title: 'Gage height (ft)' },
-          shapes: [
-            {
-              type: 'line',
-              xref: 'paper',
-              x0: 0,
-              x1: 1,
-              yref: 'y',
-              y0: 4192,
-              y1: 4192,
-              line: {
-                color: 'red',
-                width: 2,
-                dash: 'solid'
-              }
-            },
-            {
-              type: 'line',
-              xref: 'paper',
-              x0: 0,
-              x1: 1,
-              yref: 'y',
-              y0: 4198,
-              y1: 4198,
-              line: {
-                color: 'blue',
-                width: 2,
-                dash: 'solid'
-              }
-            }
-          ]
+      	title: 'GSL South Arm Water Level',
+      	xaxis: { title: 'Date' },
+      	yaxis: {
+      	  title: 'Gage height (ft)',
+      	  range: [minY - yBuffer, maxY + yBuffer]
+      	},
+      	shapes: [
+      	  {
+      		type: 'rect',
+      		xref: 'paper',
+      		x0: 0,
+      		x1: 1,
+      		yref: 'y',
+      		y0: 4198,
+      		y1: maxY + yBuffer,
+      		fillcolor: 'rgba(173, 216, 230, 0.3)',
+      		line: { width: 0 }
+      	  },
+      	  {
+      		type: 'rect',
+      		xref: 'paper',
+      		x0: 0,
+      		x1: 1,
+      		yref: 'y',
+      		y0: 4192,
+      		y1: 4198,
+      		fillcolor: 'rgba(200, 200, 200, 0.3)',
+      		line: { width: 0 }
+      	  },
+      	  {
+      		type: 'rect',
+      		xref: 'paper',
+      		x0: 0,
+      		x1: 1,
+      		yref: 'y',
+      		y0: minY - yBuffer,
+      		y1: 4192,
+      		fillcolor: 'rgba(255, 160, 160, 0.3)',
+      		line: { width: 0 }
+      	  }
+      	]
         };
+      
         Plotly.newPlot('plot', [trace], layout);
       })
       .catch(err => {
