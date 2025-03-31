@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import json
 from datetime import datetime
+import os
 
 site = "10010000"
 parameter_code = "62614"

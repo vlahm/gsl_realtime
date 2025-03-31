@@ -29,3 +29,8 @@ jobs:
           git add data/gsl_data.json
           git commit -m "Update GSL data" || echo "No changes to commit"
           git push
+
+concurrency:
+  group: gsl-data-update
+  cancel-in-progress: true
+
