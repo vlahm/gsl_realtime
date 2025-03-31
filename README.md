@@ -1,1 +1,1 @@
-![GSL Data Update](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/update-data.yml/badge.svg)
+![GSL Data Update](https://github.com/vlahm/gsl_dashboard/actions/workflows/update-data.yml/badge.svg)
