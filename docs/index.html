@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Great Salt Lake South Arm Water Level</title>
+  <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+</head>
+<body>
+  <h2>Great Salt Lake South Arm Water Level (since 2000)</h2>
+  <div id="plot" style="width:100%;height:600px;"></div>
+  <script>
+    fetch('../data/gsl_data.json')
+	//fetch('/home/mike/git/gsl/lake_level_dashboard/data/gsl_data.json')
+      .then(res => res.json())
+      .then(data => {
+        const dates = data.map(d => d.dateTime);
+        const values = data.map(d => parseFloat(d.value));
+        const trace = {
+          x: dates,
+          y: values,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Gage height (ft)'
+        };
+        const layout = {
+          title: 'GSL South Arm Water Level',
+          xaxis: { title: 'Date' },
+          yaxis: { title: 'Gage height (ft)' }
+        };
+        Plotly.newPlot('plot', [trace], layout);
+      })
+      .catch(err => {
+        document.getElementById('plot').innerText = "Failed to load data.";
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
