@@ -4,34 +4,79 @@ import json
 from datetime import datetime
 import os
 
-site = "10010000"
-parameter_code = "62614"
+south_arm = "10010000"
+north_arm = "10010100"
+param_code = "62614"
 start_date = "2000-01-01"
 end_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-url = (
-    "https://waterservices.usgs.gov/nwis/dv/?format=json"
-    f"&sites={site}"
-    f"&startDT={start_date}&endDT={end_date}"
-    f"&parameterCd={parameter_code}&siteStatus=all"
-)
+fallback_path = "data/"
 
-fallback_path = "data/gsl_data.json"
 
-try:
+def retrieve_gage(gage_id, start_date, end_date, param_code):
+
+    url = (
+        "https://waterservices.usgs.gov/nwis/dv/?format=json"
+        f"&sites={gage_id}"
+        f"&startDT={start_date}&endDT={end_date}"
+        f"&parameterCd={param_code}&siteStatus=all"
+    )
+
     r = requests.get(url, timeout=30)
     r.raise_for_status()
     data = r.json()
     records = data["value"]["timeSeries"][0]["values"][0]["value"]
     df = pd.DataFrame(records)
-    df["dateTime"] = pd.to_datetime(df["dateTime"])
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df["dateTime"] = pd.to_datetime(df["dateTime"])
+    df["date"] = df["dateTime"].dt.strftime("%Y-%m-%d")
+    # df["date"] = df["dateTime"].dt.date
+    # df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+
+    df = df.drop(["dateTime", "qualifiers"], axis=1)
     df = df.dropna()
-    df.to_json(fallback_path, orient="records", date_format="iso")
+    df.to_json(fallback_path + gage_id + ".json", orient="records")
+    return df
+
+
+try:
+    dfN = retrieve_gage(north_arm, start_date, end_date, param_code)
+    dfS = retrieve_gage(south_arm, start_date, end_date, param_code)
     print("Data successfully updated.")
 except Exception as e:
     print(f"Error fetching data: {e}")
-    if os.path.exists(fallback_path):
+    if os.path.exists(fallback_path + south_arm + ".json"):
         print("Using cached data.")
+        dfS = pd.read_json(
+            fallback_path + south_arm + ".json", orient="records", convert_dates=True
+        )
+        dfN = pd.read_json(
+            fallback_path + north_arm + ".json", orient="records", convert_dates=True
+        )
     else:
         raise RuntimeError("No data available: fetch failed and no cache found.")
+
+df = pd.merge(dfS, dfN, how="left", on="date", suffixes=["_s", "_n"])
+df["value"] = (df["value_s"] * 0.64) + (df["value_n"] * 0.36)
+df = df.drop(["value_s", "value_n"], axis=1)
+df.to_json(fallback_path + "avg.json", orient="records")
+
+avg_lvl = df.loc[df["date"].idxmax(), "value"]
+area = 21787.72 * avg_lvl - 90692145
+volume = 15490.58 * avg_lvl**2 - 129149899.44 * avg_lvl + 269191309891.96
+area_at_4207 = 1375869
+volume_at_4207 = 24088680
+
+stats = pd.DataFrame(
+    {
+        "level_n": [dfN.loc[dfN["date"].idxmax(), "value"]],
+        "level_s": [dfS.loc[dfS["date"].idxmax(), "value"]],
+        "below_healthy": [4198 - avg_lvl],
+        "pct_exposed": [100 - (area * 100 / area_at_4207)],
+        "pct_volume": [volume * 100 / volume_at_4207],
+        "sqmi_exposed": [(area_at_4207 - area) * 0.0015625],
+    },
+    index=["summary"],
+).applymap(lambda x: round(x, 1))
+
+stats.to_json(fallback_path + "stats.json", orient="records")
