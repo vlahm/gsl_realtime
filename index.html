@@ -8,7 +8,7 @@
 </head>
 
 <body>
-	<h2>Weighted average of North and South Arms</h2>
+	<!-- <h2>Weighted average of North and South Arms</h2> -->
 	<div id="plot" style="width:100%;height:400px;"></div>
 	<script>
 		fetch('data/avg.json')
@@ -17,81 +17,83 @@
 				const dates = data.map(d => d.date);
 				const values = data.map(d => parseFloat(d.value));
 
-				// Compute min and max, then add a buffer
 				const minY = Math.min(...values);
 				const maxY = Math.max(...values);
-				const yBuffer = (maxY - minY) * 0.05; // 5% buffer
+				const yBuffer = (maxY - minY) * 0.05;
+
+				const makeRectTrace = (y0, y1, color, opacity, name) => ({
+					x: [dates[0], dates[dates.length - 1], dates[dates.length - 1], dates[0]],
+					y: [y0, y0, y1, y1],
+					fill: 'toself',
+					fillcolor: color,
+					opacity: opacity,
+					line: { width: 0 },
+					hoverinfo: 'skip',
+					name: name,
+					showlegend: true,
+					type: 'scatter',
+					mode: 'lines'
+				});
+
+				const legendTitle = {
+					x: [dates[1000]],
+					y: [minY - yBuffer - 9999],
+					mode: 'markers',
+					marker: {
+						color: 'rgba(0,0,0,0)',
+						size: 0,
+						line: { width: 0 }
+					},
+					name: '<b>Elevation ranges*</b>',
+					showlegend: true,
+					hoverinfo: 'skip',
+					legendrank: 0
+				};
+
+				const polygons = [
+					legendTitle,
+					makeRectTrace(4198, maxY + yBuffer, 'rgba(173, 216, 230, 1)', 0.5, 'Healthy'),
+					makeRectTrace(4195, 4198, 'rgba(200, 200, 200, 1)', 0.1, 'Transitionary'),
+					makeRectTrace(4192, 4195, 'rgba(255, 160, 160, 1)', 0.3, 'Adverse effects'),
+					makeRectTrace(minY - yBuffer, 4192, 'rgba(255, 160, 160, 1)', 0.6, 'Serious adverse effects')
+				];
 
 				const trace = {
 					x: dates,
 					y: values,
 					type: 'scatter',
 					mode: 'lines',
-					name: 'Gage height (ft)',
-					line: { color: 'black' }
+					line: { color: 'black' },
+					showlegend: false // hide line from legend
 				};
 
 				const layout = {
-					title: '',
-					margin: {
-						l: 60,
-						r: 20,
-						t: 20,
-						b: 20
-					},
-					xaxis: {
-						title: '',
-						tickfont: { size: 14 },
-					},
+					margin: { l: 60, r: 20, t: 20, b: 20 },
+					xaxis: { tickfont: { size: 14 } },
 					yaxis: {
 						title: 'Water level (ft)',
 						tickfont: { size: 14 },
 						range: [minY - yBuffer, maxY + yBuffer]
 					},
-					shapes: [
-						{
-							type: 'rect',
-							xref: 'paper',
-							x0: 0,
-							x1: 1,
-							yref: 'y',
-							y0: 4198,
-							y1: maxY + yBuffer,
-							fillcolor: 'rgba(173, 216, 230, 0.3)',
-							line: { width: 0 }
-						},
-						{
-							type: 'rect',
-							xref: 'paper',
-							x0: 0,
-							x1: 1,
-							yref: 'y',
-							y0: 4192,
-							y1: 4198,
-							fillcolor: 'rgba(200, 200, 200, 0.3)',
-							line: { width: 0 }
-						},
-						{
-							type: 'rect',
-							xref: 'paper',
-							x0: 0,
-							x1: 1,
-							yref: 'y',
-							y0: minY - yBuffer,
-							y1: 4192,
-							fillcolor: 'rgba(255, 160, 160, 0.3)',
-							line: { width: 0 }
-						}
-					]
+					legend: {
+						itemclick: false,
+						itemdoubleclick: false,
+						bgcolor: 'rgba(255,255,255,0.8)',
+						borderwidth: 0,
+						font: { size: 12 }
+					}
 				};
 
-				Plotly.newPlot('plot', [trace], layout);
+				Plotly.newPlot('plot', [...polygons, trace], layout);
 			})
 			.catch(err => {
 				document.getElementById('plot').innerText = "Failed to load data.";
 				console.error(err);
 			});
 	</script>
+	<!-- <p>
+		*See the <a href=https://gardner.utah.edu/great-salt-lake-strike-team />Strike Team report</a>
+	</p> -->
 </body>
 
 </html>
