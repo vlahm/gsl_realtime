@@ -3,17 +3,19 @@ import pandas as pd
 import json
 from datetime import datetime
 import os
+from io import StringIO
+
 
 south_arm = "10010000"
 north_arm = "10010100"
-param_code = "62614"
+salin = "405356112205601"
 start_date = "2000-01-01"
 end_date = datetime.utcnow().strftime("%Y-%m-%d")
 
 fallback_path = "data/"
 
 
-def retrieve_gage(gage_id, start_date, end_date, param_code):
+def retrieve_elev(gage_id, start_date, end_date, param_code):
 
     url = (
         "https://waterservices.usgs.gov/nwis/dv/?format=json"
@@ -28,8 +30,8 @@ def retrieve_gage(gage_id, start_date, end_date, param_code):
     records = data["value"]["timeSeries"][0]["values"][0]["value"]
     df = pd.DataFrame(records)
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
-    df["dateTime"] = pd.to_datetime(df["dateTime"])
-    df["date"] = df["dateTime"].dt.strftime("%Y-%m-%d")
+    df["date"] = pd.to_datetime(df["dateTime"])
+    # df["date"] = df["dateTime"].dt.strftime("%Y-%m-%d")
     # df["date"] = df["dateTime"].dt.date
     # df["date"] = df["date"].dt.strftime("%Y-%m-%d")
 
@@ -39,9 +41,34 @@ def retrieve_gage(gage_id, start_date, end_date, param_code):
     return df
 
 
+def retrieve_salin(gage_id, start_date, end_date):
+
+    url = (
+        "https://api.waterdata.usgs.gov/samples-data/results/narrow?mimeType=text%2Fcsv&monitoringLocationIdentifier=USGS-"
+        f"{gage_id}&characteristicUserSupplied=Salinity%252C%2520water&siteTypeCode=LK&stateFips=US:49&activityStartDateLower="
+        f"{start_date}&activityStartDateUpper={end_date}"
+    )
+
+    r = requests.get(url, timeout=30)
+    r.raise_for_status()
+    data = StringIO(r.text)
+    df = pd.read_csv(data)
+    df = df[["Activity_StartDate", "Result_Measure"]]
+    df.rename(
+        columns={"Activity_StartDate": "date", "Result_Measure": "value"}, inplace=True
+    )
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df["date"] = pd.to_datetime(df["date"])
+    # df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+    df = df.dropna()
+    df.to_json(fallback_path + gage_id + ".json", orient="records")
+    return df
+
+
 try:
-    dfN = retrieve_gage(north_arm, start_date, end_date, param_code)
-    dfS = retrieve_gage(south_arm, start_date, end_date, param_code)
+    dfN = retrieve_elev(north_arm, start_date, end_date, "62614")
+    dfS = retrieve_elev(south_arm, start_date, end_date, "62614")
+    dfsal = retrieve_salin(salin, start_date, end_date)
     print("Data successfully updated.")
 except Exception as e:
     print(f"Error fetching data: {e}")
@@ -53,6 +80,9 @@ except Exception as e:
         dfN = pd.read_json(
             fallback_path + north_arm + ".json", orient="records", convert_dates=True
         )
+        dfsal = pd.read_json(
+            fallback_path + salin + ".json", orient="records", convert_dates=True
+        )
     else:
         raise RuntimeError("No data available: fetch failed and no cache found.")
 
@@ -60,6 +90,9 @@ df = pd.merge(dfS, dfN, how="left", on="date", suffixes=["_s", "_n"])
 df["value"] = (df["value_s"] * 0.64) + (df["value_n"] * 0.36)
 df = df.drop(["value_s", "value_n"], axis=1)
 df.to_json(fallback_path + "avg.json", orient="records")
+
+sal_recent = dfsal.loc[dfsal["date"].idxmax(), "date"]
+current_salin = dfsal[dfsal["date"] == sal_recent]["value"].mean() / 10
 
 avg_lvl = df.loc[df["date"].idxmax(), "value"]
 area = 21787.72 * avg_lvl - 90692145
@@ -75,6 +108,7 @@ stats = pd.DataFrame(
         "pct_exposed": [100 - (area * 100 / area_at_4207)],
         "pct_volume": [volume * 100 / volume_at_4207],
         "sqmi_exposed": [(area_at_4207 - area) * 0.0015625],
+        "salin": current_salin,
     },
     index=["summary"],
 ).applymap(lambda x: round(x, 1))

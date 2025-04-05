@@ -8,10 +8,9 @@
 </head>
 
 <body>
-	<!-- <h2>Weighted average of North and South Arms</h2> -->
 	<div id="plot" style="width:100%;height:400px;"></div>
 	<script>
-		fetch('data/avg.json')
+		fetch('data/10010000.json')
 			.then(res => res.json())
 			.then(data => {
 				const dates = data.map(d => d.date);
