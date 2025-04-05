@@ -30,8 +30,8 @@ def retrieve_elev(gage_id, start_date, end_date, param_code):
     records = data["value"]["timeSeries"][0]["values"][0]["value"]
     df = pd.DataFrame(records)
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
-    df["date"] = pd.to_datetime(df["dateTime"])
-    # df["date"] = df["dateTime"].dt.strftime("%Y-%m-%d")
+    df["dateTime"] = pd.to_datetime(df["dateTime"])
+    df["date"] = df["dateTime"].dt.strftime("%Y-%m-%d")
     # df["date"] = df["dateTime"].dt.date
     # df["date"] = df["date"].dt.strftime("%Y-%m-%d")
 
@@ -59,7 +59,7 @@ def retrieve_salin(gage_id, start_date, end_date):
     )
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
     df["date"] = pd.to_datetime(df["date"])
-    # df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+    df["date"] = df["date"].dt.strftime("%Y-%m-%d")
     df = df.dropna()
     df.to_json(fallback_path + gage_id + ".json", orient="records")
     return df
@@ -86,15 +86,21 @@ except Exception as e:
     else:
         raise RuntimeError("No data available: fetch failed and no cache found.")
 
+dfS["date"] = pd.to_datetime(dfS["date"])
+dfN["date"] = pd.to_datetime(dfN["date"])
+dfsal["date"] = pd.to_datetime(dfsal["date"])
+
 df = pd.merge(dfS, dfN, how="left", on="date", suffixes=["_s", "_n"])
 df["value"] = (df["value_s"] * 0.64) + (df["value_n"] * 0.36)
 df = df.drop(["value_s", "value_n"], axis=1)
+avg_lvl = df.loc[df["date"].idxmax(), "value"]
+# df["date"] = pd.to_datetime(df["date"])
+df["date"] = df["date"].dt.strftime("%Y-%m-%d")
 df.to_json(fallback_path + "avg.json", orient="records")
 
 sal_recent = dfsal.loc[dfsal["date"].idxmax(), "date"]
 current_salin = dfsal[dfsal["date"] == sal_recent]["value"].mean() / 10
 
-avg_lvl = df.loc[df["date"].idxmax(), "value"]
 area = 21787.72 * avg_lvl - 90692145
 volume = 15490.58 * avg_lvl**2 - 129149899.44 * avg_lvl + 269191309891.96
 area_at_4207 = 1375869
@@ -110,7 +116,7 @@ stats = pd.DataFrame(
         "sqmi_exposed": [str(round((area_at_4207 - area) * 0.0015625, 1)) + " mi²"],
         "sqmi_exposed_alt": [str(round((area_at_4207 - area) * 0.0015625, 1))],
         "salin": [str(round(current_salin, 1)) + "%"],
-        "salin_record_date": sal_recent.strftime("%Y-%m-%d"),
+        "salin_record_date": [sal_recent.strftime("%Y-%m-%d")],
     },
     index=["summary"],
 )
