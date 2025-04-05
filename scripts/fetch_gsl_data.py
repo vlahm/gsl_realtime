@@ -102,15 +102,18 @@ volume_at_4207 = 24088680
 
 stats = pd.DataFrame(
     {
-        "level_n": [dfN.loc[dfN["date"].idxmax(), "value"]],
-        "level_s": [dfS.loc[dfS["date"].idxmax(), "value"]],
-        "below_healthy": [4198 - avg_lvl],
-        "pct_exposed": [100 - (area * 100 / area_at_4207)],
-        "pct_volume": [volume * 100 / volume_at_4207],
-        "sqmi_exposed": [(area_at_4207 - area) * 0.0015625],
-        "salin": current_salin,
+        "level_n": [str(round(dfN.loc[dfN["date"].idxmax(), "value"], 1)) + "'"],
+        "level_s": [str(round(dfS.loc[dfS["date"].idxmax(), "value"], 1)) + "'"],
+        "below_healthy": [str(round(4198 - avg_lvl, 1)) + "'"],
+        "pct_exposed": [str(round(100 - (area * 100 / area_at_4207), 1)) + "%"],
+        "pct_volume": [str(round(volume * 100 / volume_at_4207, 1)) + "%"],
+        "sqmi_exposed": [str(round((area_at_4207 - area) * 0.0015625, 1)) + " mi²"],
+        "sqmi_exposed_alt": [str(round((area_at_4207 - area) * 0.0015625, 1))],
+        "salin": [str(round(current_salin, 1)) + "%"],
+        "salin_record_date": sal_recent.strftime("%Y-%m-%d"),
     },
     index=["summary"],
-).applymap(lambda x: round(x, 1))
+)
+# ).applymap(lambda x: round(x, 1))
 
 stats.to_json(fallback_path + "stats.json", orient="records")
