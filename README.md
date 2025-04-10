@@ -1,8 +1,8 @@
 ![GSL Data Update](https://github.com/vlahm/gsl_dashboard/actions/workflows/update-data.yml/badge.svg)
 
-### Embeddable surface elevation graph for the South Arm of the Great Salt Lake.
+### Embeddable surface elevation monitor for the South Arm of the Great Salt Lake.
 
-[![GSL water level](https://github.com/vlahm/gsl_realtime/resources/preview.png)](https://vlahm.github.io/gsl_realtime)
+[![GSL water level](https://github.com/vlahm/gsl_realtime/blob/main/resources/preview.png)](https://vlahm.github.io/gsl_realtime)
 
 Interactive graph is live at https://vlahm.github.io/gsl_realtime/. Embed this graph in your webpage with the following HTML:
 
