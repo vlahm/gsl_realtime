@@ -12,7 +12,7 @@ Interactive graph is live at https://vlahm.github.io/gsl_realtime/. Embed this g
 
 Updates daily from USGS gauge 10010000, using GitHub actions.
 
-Title and footnote are omitted, so they can be styled to fit your webpage. Title can be something like, "Great Salt Lake, daily water level". Footnote should be something like:
+Title and footnote are omitted, so they can be styled to fit your webpage. Title can be something like, "Great Salt Lake, daily water level". Footnote should reference the GSL Strike Team reports, e.g.:
 
 ```html
 *See the <a href=https://gardner.utah.edu/great-salt-lake-strike-team />Strike Team report</a>
