@@ -100,6 +100,7 @@ df.to_json(fallback_path + "avg.json", orient="records")
 
 sal_recent = dfsal.loc[dfsal["date"].idxmax(), "date"]
 current_salin = dfsal[dfsal["date"] == sal_recent]["value"].mean() / 10
+lvl_recent = dfS.loc[dfS["date"].idxmax(), "date"]
 
 area = 21787.72 * avg_lvl - 90692145
 volume = 15490.58 * avg_lvl**2 - 129149899.44 * avg_lvl + 269191309891.96
@@ -117,6 +118,8 @@ stats = pd.DataFrame(
         "sqmi_exposed_alt": [str(round((area_at_4207 - area) * 0.0015625, 1))],
         "salin": [str(round(current_salin, 1)) + "%"],
         "salin_record_date": [sal_recent.strftime("%Y-%m-%d")],
+        "level_num": [round(dfS.loc[dfS["date"].idxmax(), "value"], 1)],
+        "level_date": [lvl_recent.strftime("%b %d")],
     },
     index=["summary"],
 )
