@@ -45,7 +45,8 @@ def retrieve_salin(gage_id, start_date, end_date):
 
     url = (
         "https://api.waterdata.usgs.gov/samples-data/results/narrow?mimeType=text%2Fcsv&monitoringLocationIdentifier=USGS-"
-        f"{gage_id}&characteristicUserSupplied=Salinity%252C%2520water&siteTypeCode=LK&stateFips=US:49&activityStartDateLower="
+        f"{gage_id}&characteristicUserSupplied=Salinity%2C%20water&siteTypeCode=LK&stateFips=US:49&activityStartDateLower="
+        # f"{gage_id}&characteristicUserSupplied=Salinity%252C%2520water&siteTypeCode=LK&stateFips=US:49&activityStartDateLower="
         f"{start_date}&activityStartDateUpper={end_date}"
     )
 
