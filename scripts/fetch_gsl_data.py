@@ -108,6 +108,8 @@ area = 21787.72 * avg_lvl - 90692145
 volume = 15490.58 * avg_lvl**2 - 129149899.44 * avg_lvl + 269191309891.96
 area_at_4207 = 1375869
 volume_at_4207 = 24088680
+# min = 4167
+# max = 4207
 min = 4188
 max = 4205
 range = max - min
@@ -123,7 +125,8 @@ stats = pd.DataFrame(
         "sqmi_exposed_alt": [str(round((area_at_4207 - area) * 0.0015625, 1))],
         "salin": [str(round(current_salin, 1)) + "%"],
         "salin_record_date": [sal_recent.strftime("%Y-%m-%d")],
-        "level_pct": [round((current_lvl - min) / range * 100, 1)],
+        "pct_level_raw": [round((current_lvl - min) / range * 100, 1)],
+        "pct_volume_raw": [round(volume * 100 / volume_at_4207, 1)],
         "level_date": [lvl_recent.strftime("%b %d")],
     },
     index=["summary"],
