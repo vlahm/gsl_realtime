@@ -3,78 +3,123 @@
 
 <head>
 	<meta charset="UTF-8">
-	<title>Great Salt Lake South Arm Water Level</title>
+	<title>Great Salt Lake Water Level</title>
 	<script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
 </head>
 
 <body>
 	<div id="plot" style="width:100%;height:400px;"></div>
 	<script>
-		fetch('data/10010000.json')
-			.then(res => res.json())
-			.then(data => {
-				const dates = data.map(d => d.date);
-				const values = data.map(d => parseFloat(d.value));
+		const getJSON = path => fetch(path).then(res => res.json());
 
-				const minY = Math.min(...values);
-				const maxY = Math.max(...values);
-				const yBuffer = (maxY - minY) * 0.05;
+		Promise.all([
+			getJSON('data/10010000.json'),
+			getJSON('data/10010100.json'),
+			getJSON('data/avg.json')
+		])
+			.then(([south, north, avg]) => {
+				// lake-wide % volume (from weighted N/S average level), keyed by date
+				const volByDate = Object.fromEntries(avg.map(d => [d.date, d.pct_volume]));
 
-				const makeRectTrace = (y0, y1, color, opacity, name) => ({
-					x: [dates[0], dates[dates.length - 1], dates[dates.length - 1], dates[0]],
-					y: [y0, y0, y1, y1],
-					fill: 'toself',
-					fillcolor: color,
-					opacity: opacity,
-					line: { width: 0 },
-					hoverinfo: 'skip',
-					name: name,
-					showlegend: true,
-					type: 'scatter',
-					mode: 'lines'
-				});
-
-				const legendTitle = {
-					x: [dates[1000]],
-					y: [minY - yBuffer - 9999],
-					mode: 'markers',
-					marker: {
-						color: 'rgba(0,0,0,0)',
-						size: 0,
-						line: { width: 0 }
-					},
-					name: '<b>Elevation ranges*</b>',
-					showlegend: true,
-					hoverinfo: 'skip',
-					legendrank: 0
-				};
-
-				const polygons = [
-					legendTitle,
-					makeRectTrace(4198, maxY + yBuffer, 'rgba(173, 216, 230, 1)', 0.5, 'Healthy'),
-					makeRectTrace(4195, 4198, 'rgba(200, 200, 200, 1)', 0.1, 'Transitionary'),
-					makeRectTrace(4192, 4195, 'rgba(255, 160, 160, 1)', 0.3, 'Adverse effects'),
-					makeRectTrace(minY - yBuffer, 4192, 'rgba(255, 160, 160, 1)', 0.6, 'Serious adverse effects')
+				const arms = [
+					{ name: 'South Arm', data: south, color: 'black' },
+					{ name: 'North Arm', data: north, color: '#2b5ba8' }
 				];
 
-				const trace = {
-					x: dates,
-					y: values,
-					type: 'scatter',
-					mode: 'lines',
-					line: { color: 'black' },
-					showlegend: false // hide line from legend
-				};
+				const allValues = [...south, ...north].map(d => parseFloat(d.value));
+				const minY = Math.min(...allValues);
+				const maxY = Math.max(...allValues);
+				const yBuffer = (maxY - minY) * 0.05;
+				const yLo = minY - yBuffer;
+				const yHi = maxY + yBuffer;
+
+				// pad the right edge so the latest observation isn't flush with the axis
+				const allDates = [...south, ...north].map(d => d.date).sort();
+				const xStart = allDates[0];
+				const xLastMs = Date.parse(allDates[allDates.length - 1]);
+				const xEnd = new Date(xLastMs + (xLastMs - Date.parse(xStart)) * 0.02)
+					.toISOString().slice(0, 10);
+
+				const regions = [
+					{ y0: 4198, y1: yHi, color: 'rgba(173, 216, 230, 1)', opacity: 0.5, label: 'Healthy' },
+					{ y0: 4195, y1: 4198, color: 'rgba(200, 200, 200, 1)', opacity: 0.1, label: 'Transitionary' },
+					{ y0: 4192, y1: 4195, color: 'rgba(255, 160, 160, 1)', opacity: 0.3, label: 'Adverse effects' },
+					{ y0: yLo, y1: 4192, color: 'rgba(255, 160, 160, 1)', opacity: 0.6, label: 'Serious adverse effects' }
+				].filter(r => r.y1 > r.y0);
+
+				const shapes = regions.map(r => ({
+					type: 'rect',
+					xref: 'paper', x0: 0, x1: 1,
+					yref: 'y', y0: r.y0, y1: r.y1,
+					fillcolor: r.color,
+					opacity: r.opacity,
+					line: { width: 0 },
+					layer: 'below'
+				}));
+
+				// label each region at its bottom-left corner
+				const annotations = regions.map(r => ({
+					xref: 'paper', x: 0, xanchor: 'left', xshift: 4,
+					yref: 'y', y: r.y0, yanchor: 'bottom', yshift: 2,
+					text: r.label,
+					showarrow: false,
+					bgcolor: 'rgba(255,255,255,0.6)',
+					font: { size: 11, color: '#444' }
+				}));
+
+				const traces = arms.flatMap(arm => {
+					const dates = arm.data.map(d => d.date);
+					const values = arm.data.map(d => parseFloat(d.value));
+					const vols = dates.map(dt => volByDate[dt] != null ? volByDate[dt] + '%' : 'n/a');
+					const last = dates.length - 1;
+					const hovertemplate =
+						`<b>${arm.name}</b><br>%{x|%b %-d, %Y}<br>` +
+						'Elevation: %{y:.1f} ft<br>Lake volume: %{customdata}<extra></extra>';
+
+					return [
+						{
+							x: dates,
+							y: values,
+							customdata: vols,
+							name: arm.name,
+							type: 'scatter',
+							mode: 'lines',
+							line: { color: arm.color, width: 2 },
+							hovertemplate: hovertemplate
+						},
+						{
+							// highlight the most recent observation
+							x: [dates[last]],
+							y: [values[last]],
+							customdata: [vols[last]],
+							name: arm.name,
+							type: 'scatter',
+							mode: 'markers',
+							marker: { color: arm.color, size: 8 },
+							hovertemplate: hovertemplate,
+							showlegend: false
+						}
+					];
+				});
 
 				const layout = {
 					margin: { l: 60, r: 20, t: 20, b: 20 },
-					xaxis: { tickfont: { size: 14 } },
+					xaxis: {
+						tickfont: { size: 14 },
+						range: [xStart, xEnd]
+					},
 					yaxis: {
 						title: 'Elevation (ft)',
 						tickfont: { size: 14 },
-						range: [minY - yBuffer, maxY + yBuffer]
+						range: [yLo, yHi]
 					},
+					shapes: shapes,
+					annotations: annotations,
+					// compact line key inside the plot, so it doesn't steal width on mobile
 					legend: {
+						orientation: 'h',
+						x: 1, xanchor: 'right',
+						y: 1, yanchor: 'top',
 						itemclick: false,
 						itemdoubleclick: false,
 						bgcolor: 'rgba(255,255,255,0.8)',
@@ -83,7 +128,7 @@
 					}
 				};
 
-				Plotly.newPlot('plot', [...polygons, trace], layout);
+				Plotly.newPlot('plot', traces, layout, { responsive: true });
 			})
 			.catch(err => {
 				document.getElementById('plot').innerText = "Failed to load data.";

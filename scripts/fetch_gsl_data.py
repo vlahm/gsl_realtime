@@ -95,6 +95,14 @@ df = pd.merge(dfS, dfN, how="left", on="date", suffixes=["_s", "_n"])
 df["value"] = (df["value_s"] * 0.64) + (df["value_n"] * 0.36)
 df = df.drop(["value_s", "value_n"], axis=1)
 avg_lvl = df.loc[df["date"].idxmax(), "value"]
+
+
+def volume_from_level(lvl):
+    return 15490.58 * lvl**2 - 129149899.44 * lvl + 269191309891.96
+
+
+volume_at_4207 = 24088680
+df["pct_volume"] = (volume_from_level(df["value"]) * 100 / volume_at_4207).round(1)
 # df["date"] = pd.to_datetime(df["date"])
 df["date"] = df["date"].dt.strftime("%Y-%m-%d")
 df.to_json(fallback_path + "avg.json", orient="records")
@@ -105,9 +113,8 @@ lvl_recent = dfS.loc[dfS["date"].idxmax(), "date"]
 current_lvl = dfS.loc[dfS["date"].idxmax(), "value"]
 
 area = 21787.72 * avg_lvl - 90692145
-volume = 15490.58 * avg_lvl**2 - 129149899.44 * avg_lvl + 269191309891.96
+volume = volume_from_level(avg_lvl)
 area_at_4207 = 1375869
-volume_at_4207 = 24088680
 # min = 4167
 # max = 4207
 min = 4188
