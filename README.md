@@ -15,6 +15,6 @@ Updates every six hours via GitHub Actions, using USGS gauges [10010000](https:/
 Title and footnote are omitted, so they can be styled to fit your webpage. Title can be something like, "Great Salt Lake, daily water level". Footnote should reference the GSL Strike Team reports, e.g.:
 
 ```html
-*See the <a href=https://gardner.utah.edu/great-salt-lake-strike-team />Strike Team report</a>
+See the <a href=https://gardner.utah.edu/great-salt-lake-strike-team />Strike Team report</a>
 ```
 
