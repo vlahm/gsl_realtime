@@ -8,9 +8,38 @@
 </head>
 
 <body>
-	<div id="plot" style="width:100%;height:400px;"></div>
+	<style>
+		/* minimal two-handle time slider, inset to line up with the plot area */
+		#timeline { margin: 4px 20px 0 60px; font: 12px "Open Sans", verdana, arial, sans-serif; color: #666; }
+		#timeline .track { position: relative; height: 20px; }
+		#timeline .track::before,
+		#timeline .fill { content: ''; position: absolute; top: 8px; height: 4px; border-radius: 2px; }
+		#timeline .track::before { left: 0; right: 0; background: #e2e2e2; }
+		#timeline .fill { background: #999; }
+		#timeline input { position: absolute; left: 0; top: 0; width: 100%; height: 20px; margin: 0;
+			background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+		#timeline input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; cursor: ew-resize;
+			width: 18px; height: 18px; border-radius: 50%; background: white; border: 2px solid #666; }
+		#timeline input::-moz-range-thumb { pointer-events: auto; cursor: ew-resize;
+			width: 14px; height: 14px; border-radius: 50%; background: white; border: 2px solid #666; }
+		#timeline input::-webkit-slider-runnable-track { background: none; }
+		#timeline input::-moz-range-track { background: none; }
+		#timeline .ends { display: flex; justify-content: space-between; }
+	</style>
+	<div id="plot" style="width:100%;height:360px;"></div>
+	<div id="timeline">
+		<div class="track">
+			<div class="fill"></div>
+			<input type="range" id="tStart" aria-label="Start date">
+			<input type="range" id="tEnd" aria-label="End date">
+		</div>
+		<div class="ends"><span id="recordFirst"></span><span id="recordLast"></span></div>
+	</div>
 	<script>
 		const getJSON = path => fetch(path).then(res => res.json());
+
+		// initial view; the time slider reaches back through the full period of record
+		const initialStart = '2000-01-01';
 
 		Promise.all([
 			getJSON('data/10010000.json'),
@@ -22,30 +51,37 @@
 				const volByDate = Object.fromEntries(avg.map(d => [d.date, d.pct_volume]));
 
 				const arms = [
-					{ name: 'South Arm', data: south, color: 'black' },
-					{ name: 'North Arm', data: north, color: '#2b5ba8' }
+					{ name: 'South Arm', data: south, color: '#274f45' },
+					{ name: 'North Arm', data: north, color: '#834470' }
 				];
 
-				const allValues = [...south, ...north].map(d => parseFloat(d.value));
-				const minY = Math.min(...allValues);
-				const maxY = Math.max(...allValues);
-				const yBuffer = (maxY - minY) * 0.05;
-				const yLo = minY - yBuffer;
-				const yHi = maxY + yBuffer;
+				const allDates = [...south, ...north].map(d => d.date).sort();
+				const recordStart = allDates[0];
+				const xLastMs = Date.parse(allDates[allDates.length - 1]);
+				const toDate = ms => new Date(ms).toISOString().slice(0, 10);
 
 				// pad the right edge so the latest observation isn't flush with the axis
-				const allDates = [...south, ...north].map(d => d.date).sort();
-				const xStart = allDates[0];
-				const xLastMs = Date.parse(allDates[allDates.length - 1]);
-				const xEnd = new Date(xLastMs + (xLastMs - Date.parse(xStart)) * 0.02)
-					.toISOString().slice(0, 10);
+				const xEnd = toDate(xLastMs + (xLastMs - Date.parse(initialStart)) * 0.02);
 
+				// fit the y-axis to whatever data falls within the visible date window
+				const yRangeFor = ([x0, x1]) => {
+					const vals = [...south, ...north]
+						.filter(d => d.date >= x0 && d.date <= x1)
+						.map(d => parseFloat(d.value));
+					if (!vals.length) return null;
+					const lo = Math.min(...vals);
+					const hi = Math.max(...vals);
+					const buf = Math.max((hi - lo) * 0.05, 0.5);
+					return [lo - buf, hi + buf];
+				};
+
+				// bands extend well beyond any plausible lake level; the axis range clips them
 				const regions = [
-					{ y0: 4198, y1: yHi, color: 'rgba(173, 216, 230, 1)', opacity: 0.5, label: 'Healthy' },
+					{ y0: 4198, y1: 4300, color: 'rgba(173, 216, 230, 1)', opacity: 0.5, label: 'Healthy' },
 					{ y0: 4195, y1: 4198, color: 'rgba(200, 200, 200, 1)', opacity: 0.1, label: 'Transitionary' },
 					{ y0: 4192, y1: 4195, color: 'rgba(255, 160, 160, 1)', opacity: 0.3, label: 'Adverse effects' },
-					{ y0: yLo, y1: 4192, color: 'rgba(255, 160, 160, 1)', opacity: 0.6, label: 'Serious adverse effects' }
-				].filter(r => r.y1 > r.y0);
+					{ y0: 4100, y1: 4192, color: 'rgba(255, 160, 160, 1)', opacity: 0.6, label: 'Serious adverse effects' }
+				];
 
 				const shapes = regions.map(r => ({
 					type: 'rect',
@@ -57,24 +93,27 @@
 					layer: 'below'
 				}));
 
-				// label each region at its bottom-left corner
-				const annotations = regions.map(r => ({
-					xref: 'paper', x: 0, xanchor: 'left', xshift: 4,
-					yref: 'y', y: r.y0, yanchor: 'bottom', yshift: 2,
-					text: r.label,
-					showarrow: false,
-					bgcolor: 'rgba(255,255,255,0.6)',
-					font: { size: 11, color: '#444' }
-				}));
+				// label each band at the bottom-left of its visible portion
+				const annotationsFor = ([yLo, yHi]) => regions
+					.filter(r => r.y1 > yLo && r.y0 < yHi)
+					.map(r => ({
+						xref: 'paper', x: 0, xanchor: 'left', xshift: 4,
+						yref: 'y', y: Math.max(r.y0, yLo), yanchor: 'bottom', yshift: 2,
+						text: r.label,
+						showarrow: false,
+						bgcolor: 'rgba(255,255,255,0.6)',
+						font: { size: 11, color: '#444' }
+					}));
 
 				const traces = arms.flatMap(arm => {
 					const dates = arm.data.map(d => d.date);
 					const values = arm.data.map(d => parseFloat(d.value));
-					const vols = dates.map(dt => volByDate[dt] != null ? volByDate[dt] + '%' : 'n/a');
+					// volume is unavailable before the North Arm record begins
+					const vols = dates.map(dt => volByDate[dt] != null ? `<br>Lake volume: ${volByDate[dt]}%` : '');
 					const last = dates.length - 1;
 					const hovertemplate =
 						`<b>${arm.name}</b><br>%{x|%b %-d, %Y}<br>` +
-						'Elevation: %{y:.1f} ft<br>Lake volume: %{customdata}<extra></extra>';
+						'Elevation: %{y:.1f} ft%{customdata}<extra></extra>';
 
 					return [
 						{
@@ -102,19 +141,25 @@
 					];
 				});
 
+				const initialX = [initialStart, xEnd];
+				const initialY = yRangeFor(initialX);
+
 				const layout = {
 					margin: { l: 60, r: 20, t: 20, b: 20 },
 					xaxis: {
 						tickfont: { size: 14 },
-						range: [xStart, xEnd]
+						range: initialX,
+						minallowed: recordStart,
+						maxallowed: xEnd
 					},
 					yaxis: {
 						title: 'Elevation (ft)',
 						tickfont: { size: 14 },
-						range: [yLo, yHi]
+						range: initialY,
+						fixedrange: true
 					},
 					shapes: shapes,
-					annotations: annotations,
+					annotations: annotationsFor(initialY),
 					// compact line key inside the plot, so it doesn't steal width on mobile
 					legend: {
 						orientation: 'h',
@@ -128,7 +173,65 @@
 					}
 				};
 
-				Plotly.newPlot('plot', traces, layout, { responsive: true });
+				Plotly.newPlot('plot', traces, layout, {
+					responsive: true,
+					modeBarButtonsToRemove: ['select2d', 'lasso2d']
+				}).then(gd => {
+					// time slider: values are days since the start of the record
+					const dayMs = 864e5;
+					const recordStartMs = Date.parse(recordStart);
+					const toDays = ms => Math.round((ms - recordStartMs) / dayMs);
+					const fromDays = n => toDate(recordStartMs + n * dayMs);
+					const minSpanDays = 365;
+					const tStart = document.getElementById('tStart');
+					const tEnd = document.getElementById('tEnd');
+					const fill = document.querySelector('#timeline .fill');
+					const maxDays = toDays(Date.parse(xEnd));
+					for (const t of [tStart, tEnd]) { t.min = 0; t.max = maxDays; t.step = 1; }
+					document.getElementById('recordFirst').textContent = recordStart.slice(0, 4);
+					document.getElementById('recordLast').textContent = allDates[allDates.length - 1].slice(0, 4);
+
+					const drawFill = () => {
+						fill.style.left = (tStart.value / maxDays * 100) + '%';
+						fill.style.right = (100 - tEnd.value / maxDays * 100) + '%';
+					};
+					const syncSlider = ([x0, x1]) => {
+						tStart.value = toDays(Date.parse(x0));
+						tEnd.value = toDays(Date.parse(x1));
+						drawFill();
+					};
+					const viewFor = xRange => {
+						const yRange = yRangeFor(xRange);
+						return { 'xaxis.range': xRange, 'yaxis.range': yRange, annotations: annotationsFor(yRange) };
+					};
+					syncSlider(initialX);
+
+					let frame = null;
+					const onSlide = moved => {
+						// keep the handles at least a year apart
+						if (+tEnd.value - +tStart.value < minSpanDays) {
+							if (moved === tStart) tStart.value = +tEnd.value - minSpanDays;
+							else tEnd.value = +tStart.value + minSpanDays;
+						}
+						drawFill();
+						if (frame) return;
+						frame = requestAnimationFrame(() => {
+							frame = null;
+							Plotly.relayout(gd, viewFor([fromDays(+tStart.value), fromDays(+tEnd.value)]));
+						});
+					};
+					tStart.addEventListener('input', () => onSlide(tStart));
+					tEnd.addEventListener('input', () => onSlide(tEnd));
+
+					// after a zoom or double-click reset: rescale y, reposition band labels, move the handles
+					gd.on('plotly_relayout', ev => {
+						if ('yaxis.range' in ev) return; // our own update
+						if (!Object.keys(ev).some(k => k.startsWith('xaxis'))) return;
+						const xRange = gd.layout.xaxis.range.map(x => String(x).slice(0, 10));
+						syncSlider(xRange);
+						if (yRangeFor(xRange)) Plotly.relayout(gd, viewFor(xRange));
+					});
+				});
 			})
 			.catch(err => {
 				document.getElementById('plot').innerText = "Failed to load data.";

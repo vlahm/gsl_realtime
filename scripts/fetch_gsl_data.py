@@ -10,6 +10,7 @@ south_arm = "10010000"
 north_arm = "10010100"
 salin = "405356112205601"
 start_date = "2000-01-01"
+elev_start_date = "1800-01-01"  # full period of record (South Arm begins 1847)
 end_date = datetime.utcnow().strftime("%Y-%m-%d")
 
 fallback_path = "data/"
@@ -67,8 +68,8 @@ def retrieve_salin(gage_id, start_date, end_date):
 
 
 try:
-    dfN = retrieve_elev(north_arm, start_date, end_date, "62614")
-    dfS = retrieve_elev(south_arm, start_date, end_date, "62614")
+    dfN = retrieve_elev(north_arm, elev_start_date, end_date, "62614")
+    dfS = retrieve_elev(south_arm, elev_start_date, end_date, "62614")
     dfsal = retrieve_salin(salin, start_date, end_date)
     print("Data successfully updated.")
 except Exception as e:
